@@ -106,10 +106,11 @@ tgep_meta <- function(yi, vi, n_boot = 100, temperature = 1.0, n_cores = 1, conf
       })
     }
     boot_est <- boot_est[!is.na(boot_est) & is.finite(boot_est)]
-    se <- if(length(boot_est) > 5) sd(boot_est) else sqrt(sum(main_res$weights^2 * main_res$guard_vars))
+    se <- if(length(boot_est) > 5) sd(boot_est) else sum(main_res$weights * sqrt(main_res$guard_vars))
   } else {
-    # Analytical approximation (Conservative)
-    se <- sqrt(sum(main_res$weights^2 * main_res$guard_vars))
+    # Analytical approximation assuming perfect guard correlation (conservative)
+    # Guards share the same data, so V = (sum alpha_g * sqrt(V_g))^2
+    se <- sum(main_res$weights * sqrt(main_res$guard_vars))
   }
 
   z_crit <- qnorm(1 - (1 - conf.level) / 2)
