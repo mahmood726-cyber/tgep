@@ -14,7 +14,7 @@
 
 **Methods:** We propose Triple-Guard Ensemble Pooling (TGEP), a frequentist ensemble framework that integrates three specialized estimators — Grey Relational Meta-Analysis (GRMA), Winsorized Robust Detection (WRD), and Significance-Weighted Adjustment (SWA) — via leave-one-out cross-validation (LOO-CV) stacking with softmax temperature weighting. A Monte Carlo simulation study (500 iterations x 18 scenarios) evaluated TGEP against REML, Hartung-Knapp-Sidik-Jonkman (HKSJ), trim-and-fill, and PET-PEESE across varying numbers of studies (k = 5-20), between-study heterogeneity (tau-squared = 0.01-1.00), and publication bias mechanisms (significance-based and one-sided). The target estimand was the unconditional population mean effect mu (pre-selection).
 
-**Results:** Under one-sided publication bias (k = 20, tau-squared = 0.10), TGEP reduced absolute bias by 24% relative to REML (0.069 vs. 0.091) and achieved the lowest RMSE (0.107 vs. REML 0.121). Under significance-based bias, TGEP showed modest bias reductions (6-11% vs. REML). In unbiased scenarios, TGEP maintained RMSE comparable to REML (within 5%). However, TGEP's analytical standard error underestimated empirical variability (SE ratio 0.83-1.06), producing coverage below the nominal 95% level (86-95% in unbiased settings). PET-PEESE achieved the best coverage under publication bias (88-90%) but overcorrected in unbiased settings (RMSE 2-4x larger). HKSJ provided the most reliable coverage across all scenarios (93-96%).
+**Results:** Under one-sided publication bias (k = 20, tau-squared = 0.10), TGEP reduced absolute bias by 24% relative to REML (0.069 vs. 0.091) and achieved the lowest RMSE (0.107 vs. REML 0.121). Under significance-based bias, TGEP reduced bias by 1-23% versus REML, with larger gains at lower bias severity. In unbiased scenarios, TGEP maintained RMSE comparable to REML (within 5%). However, TGEP's analytical standard error underestimated empirical variability (SE ratio 0.77-1.06), producing coverage below the nominal 95% level (87-95% in unbiased settings). PET-PEESE achieved the best coverage under publication bias (88-90%) but overcorrected in unbiased settings (RMSE 4-6x larger). HKSJ provided the most reliable coverage in unbiased scenarios (94-96%), though all methods suffered substantial coverage loss under strong significance-based bias.
 
 **Conclusions:** TGEP produces less biased point estimates than REML under publication bias, particularly one-sided selection, without the overcorrection risk of PET-PEESE. However, its confidence interval coverage is limited by analytical SE underestimation. We recommend TGEP as a complementary sensitivity analysis alongside HKSJ for inference and PET-PEESE for bias assessment. The method is implemented as an open-source R package.
 
@@ -108,7 +108,7 @@ Because the three guards are computed from the same data and are therefore stron
 
 SE_TGEP = sum_g(alpha_g * sqrt(V_g))
 
-This yields V_TGEP = SE_TGEP^2. This is conservative relative to the independent-guard formula sum_g(alpha_g^2 * V_g) but, as our simulation study demonstrates, still underestimates the true variability of the ensemble estimator. Confidence intervals use the normal approximation: mu_hat_TGEP +/- z_(1-alpha/2) * SE_TGEP. A nonparametric bootstrap (B = 200 by default) is also available for variance estimation that accounts for the additional uncertainty from the LOO-CV weight selection.
+This yields V_TGEP = SE_TGEP^2. This yields wider confidence intervals than the independent-guard formula sum_g(alpha_g^2 * V_g), but neither formula accounts for the additional variability introduced by the data-dependent weight estimation; as our simulation study demonstrates, the net result still underestimates the true variability of the ensemble estimator. Confidence intervals use the normal approximation: mu_hat_TGEP +/- z_(1-alpha/2) * SE_TGEP. A nonparametric bootstrap (B = 200 by default) is also available for variance estimation that accounts for the additional uncertainty from the LOO-CV weight selection.
 
 For meta-analyses with K < 3 studies, LOO-CV is uninformative, and TGEP falls back to equal guard weighting (alpha_g = 1/3 for all g).
 
@@ -129,7 +129,7 @@ The target estimand was the unconditional population mean mu (the pre-selection 
 We simulated random-effects meta-analysis data for standardized mean differences (SMD). For each of K studies:
 
 1. Sample the per-arm sample size: n_i ~ Uniform(20, 100)
-2. Compute the within-study variance using the SMD variance approximation: v_i = 2/n_i + mu^2/(4*n_i), yielding realistic variances in the range 0.02-0.10 for the chosen effect sizes.
+2. Compute the within-study variance using the large-sample SMD variance approximation [1]: v_i = 2/n_i + mu^2/(4*n_i), yielding realistic variances in the range 0.02-0.10 for the chosen effect sizes.
 3. Sample the true study-specific effect: theta_i ~ N(mu, tau^2)
 4. Sample the observed effect: y_i ~ N(theta_i, v_i)
 
@@ -138,14 +138,14 @@ Publication bias was simulated via two mechanisms:
 - **Significance-based**: Studies with p < 0.05 (two-sided z-test using within-study SE) were always published; non-significant studies were published with probability 1 - beta, where beta in {0.50, 0.80, 0.95} controlled bias severity.
 - **One-sided**: Studies with effects in the expected direction (y_i > 0) were always published; negative effects were published with probability 1 - beta.
 
-A minimum of 3 studies was enforced in all scenarios to ensure estimability.
+A minimum of 3 studies was enforced in all scenarios to ensure estimability. When selection reduced the sample below 3, the 3 studies with the smallest p-values (significance-based) or largest effects (one-sided) were retained.
 
 #### Methods Compared
 
 1. **REML**: Standard restricted maximum likelihood random-effects meta-analysis [2] with Wald-type confidence intervals.
-2. **HKSJ**: REML with the Hartung-Knapp-Sidik-Jonkman adjustment [6] using a t_(K-1) reference distribution for confidence intervals.
+2. **HKSJ**: REML with the Hartung-Knapp-Sidik-Jonkman adjustment [6,17,18] using a t_(K-1) reference distribution for confidence intervals.
 3. **TGEP**: Triple-Guard Ensemble Pooling with T = 1.0 and analytical variance (no bootstrap, for computational efficiency in the simulation).
-4. **Trim-and-fill**: The Duval-Tweedie trim-and-fill method [7] applied to the REML fit, which estimates the number of "missing" studies and imputes them to restore funnel plot symmetry.
+4. **Trim-and-fill**: The Duval-Tweedie trim-and-fill method [7] applied to the REML fit using the L0 estimator (the metafor default), which estimates the number of "missing" studies and imputes them to restore funnel plot symmetry.
 5. **PET-PEESE**: The precision-effect test / precision-effect estimate with standard error (PET-PEESE) [8]. PET regresses effect sizes on standard errors; if the PET intercept is significant at p < 0.10, PEESE (regression on variances) is used instead.
 
 If any of the three core methods (REML, HKSJ, TGEP) failed for a given iteration, that entire iteration was discarded. Trim-and-fill and PET-PEESE failures were treated as missing for that iteration only.
@@ -320,8 +320,8 @@ Table 4 presents the results of applying TGEP and REML to 15 Cochrane datasets.
 
 **Table 4. Empirical Validation: TGEP vs. REML on 15 Cochrane Datasets**
 
-| Dataset | K | REML Est. | TGEP Est. | Abs. Diff | REML SE | TGEP SE | SE Ratio |
-|---------|---|-----------|-----------|-----------|---------|---------|----------|
+| Dataset | K | REML Est. | TGEP Est. | Abs. Diff | REML SE | TGEP SE | Relative SE |
+|---------|---|-----------|-----------|-----------|---------|---------|-------------|
 | CD015252 | 8 | 0.332 | 0.303 | 0.029 | 0.215 | 0.486 | 2.26 |
 | CD012445 | 8 | -0.083 | -0.081 | 0.002 | 0.716 | 0.701 | 0.98 |
 | CD013844 | 12 | -0.495 | -0.264 | 0.231 | 0.474 | 0.748 | 1.58 |
@@ -340,7 +340,7 @@ Table 4 presents the results of applying TGEP and REML to 15 Cochrane datasets.
 | **Mean** | | | | **0.052** | | | **2.23** |
 | **Median** | | | | **0.032** | | | **2.04** |
 
-Across the 15 datasets, TGEP estimates differed from REML by a mean absolute difference of 0.052 (median 0.032) on the standardized scale. The mean SE ratio (TGEP SE / REML SE) was 2.23, substantially wider than the simulation SE ratio within TGEP alone (0.77-1.06), because the empirical SE ratio here compares TGEP against REML rather than TGEP's model SE against its own empirical SE. The wider TGEP SEs in the empirical validation largely reflect the conservative perfect-correlation variance formula applied across three guards whose individual variances may differ substantially from the REML variance.
+Across the 15 datasets, TGEP estimates differed from REML by a mean absolute difference of 0.052 (median 0.032) on the standardized scale. The mean relative SE (TGEP SE / REML SE) was 2.23, substantially wider than the simulation SE ratio within TGEP alone (0.77-1.06), because the empirical SE ratio here compares TGEP against REML rather than TGEP's model SE against its own empirical SE. The wider TGEP SEs in the empirical validation largely reflect the conservative perfect-correlation variance formula applied across three guards whose individual variances may differ substantially from the REML variance.
 
 The largest point-estimate difference occurred for CD013844 (K = 12), where TGEP pulled the estimate toward zero (from -0.495 to -0.264), suggesting the GRMA or SWA guards identified influential studies or potential publication bias. In datasets with minimal heterogeneity (e.g., CD015140), TGEP and REML produced nearly identical results.
 
@@ -350,7 +350,7 @@ The largest point-estimate difference occurred for CD013844 (K = 12), where TGEP
 
 We proposed TGEP, a frequentist ensemble framework for meta-analysis that integrates three specialized guard estimators via LOO-CV stacking. In a comprehensive simulation study comparing five methods across 18 scenarios, TGEP demonstrated two principal strengths and one important limitation.
 
-**Strengths.** First, TGEP produced less biased point estimates than REML under one-sided publication bias, reducing absolute bias by 24-30% and RMSE by 9-12%. This advantage was most pronounced when the selection mechanism was directional rather than significance-based. Second, TGEP achieved lower RMSE than REML in high-heterogeneity scenarios (tau^2 = 0.50-1.00) and in null-effect settings, suggesting that the ensemble weighting can improve estimation precision even when publication bias is not the primary concern.
+**Strengths.** First, TGEP produced less biased point estimates than REML under one-sided publication bias, reducing absolute bias by 24-30% and RMSE by approximately 9-12%. This advantage was most pronounced when the selection mechanism was directional rather than significance-based. Second, TGEP achieved lower RMSE than REML in high-heterogeneity scenarios (tau^2 = 0.50-1.00) and in null-effect settings, suggesting that the ensemble weighting can improve estimation precision even when publication bias is not the primary concern.
 
 **Limitation.** TGEP's confidence interval coverage was below nominal in most scenarios (86-95% in unbiased settings, 28-88% under publication bias), consistently worse than both REML and HKSJ. The primary cause was SE underestimation: TGEP's analytical SE ratio ranged from 0.77 to 1.06 across scenarios, with the most severe underestimation occurring under combined heterogeneity and bias. This limits TGEP's utility for formal statistical inference.
 
@@ -358,19 +358,27 @@ We proposed TGEP, a frequentist ensemble framework for meta-analysis that integr
 
 Our simulation provides a comparative assessment of five commonly used approaches:
 
-**HKSJ** provided the most reliable coverage across all scenarios (82-96%), confirming its role as the preferred method for inference when publication bias is not the primary concern [6]. Its t-distribution correction addresses SE underestimation effectively, but it does not correct the biased point estimate.
+**HKSJ** provided the most reliable coverage in unbiased and mildly biased scenarios (91-96%), and the best relative coverage under publication bias among non-bias-correction methods, though coverage still declined substantially under strong significance-based bias (39-86%) [6]. Its t-distribution correction addresses SE underestimation effectively but does not correct the biased point estimate.
 
-**PET-PEESE** was the most effective method for maintaining coverage under significance-based publication bias (88-90%), consistent with prior comparisons [5]. However, PET-PEESE exhibited substantially inflated RMSE in unbiased scenarios (2-4x higher than REML), reflecting the cost of fitting unnecessary bias-correction parameters. This overcorrection is a well-known limitation [9].
+**PET-PEESE** was the most effective method for maintaining coverage under significance-based publication bias (88-90%), consistent with prior comparisons [5]. However, PET-PEESE exhibited substantially inflated RMSE in unbiased scenarios (4-6x higher than REML), reflecting the cost of fitting unnecessary bias-correction parameters. This overcorrection is a well-known limitation [9].
 
 **Trim-and-fill** provided moderate coverage improvements under significance-based bias (42-58% vs. REML 32-51% under strong/severe bias) but performed poorly under one-sided bias (70-85%), where the funnel-plot symmetry assumption is most violated.
 
-**TGEP** occupies a complementary niche: it provides modest point-estimation improvements without the overcorrection risk of PET-PEESE. In unbiased settings, TGEP RMSE was within 3-5% of REML, whereas PET-PEESE RMSE was 300-400% higher. Under one-sided bias, TGEP achieved the largest bias reductions among all methods that do not assume a specific bias mechanism.
+**TGEP** occupies a complementary niche: it provides modest point-estimation improvements without the overcorrection risk of PET-PEESE. In unbiased settings, TGEP RMSE was within 3-5% of REML, whereas PET-PEESE RMSE was 4-6x higher. Under one-sided bias, TGEP achieved the largest bias reductions among all methods that do not assume a specific bias mechanism.
 
 ### The LOO-CV Limitation
 
 A fundamental tension in TGEP's design is that LOO-CV optimizes prediction of the observed data, which may itself be biased by selective publication. When the selection mechanism is significance-based, the SWA guard — which up-weights non-significant studies — may actually predict the observed (predominantly significant) data less well than the WRD or GRMA guards that do not attempt bias correction. This can result in the LOO-CV assigning suboptimal weight to the guard most relevant for bias correction.
 
 This limitation is inherent to any stacking approach applied to biased data and explains why TGEP's bias correction is modest compared to methods like PET-PEESE that directly model the bias mechanism. Under one-sided bias, where the selection is directional rather than significance-based, this tension is less severe, and TGEP's advantage is correspondingly larger.
+
+### GRMA Guard Under Publication Bias
+
+A subtlety of the GRMA guard is that it uses the median of observed effect sizes as its reference point. Under publication bias, this median is inflated, causing the GRMA guard to assign higher weights to studies close to the biased median rather than to the true population mean. In this sense, GRMA functions primarily as an outlier-robustness tool rather than a bias-correction tool, and under publication bias it may partially counteract the SWA guard's correction. This interaction between guards is mediated by the LOO-CV stacking weights but is not explicitly modeled.
+
+### SWA Selection Probability Mismatch
+
+The SWA guard assumes a fixed selection probability of 0.4 for non-significant studies, corresponding to an up-weighting factor of 2.5. In the simulation, the actual selection probabilities were 0.50 (mild), 0.20 (strong), and 0.05 (severe). Under severe bias, the true selection probability (0.05) is 8-fold lower than the SWA assumption (0.40), leading to substantial under-correction. This mismatch is the primary reason TGEP's bias reduction diminishes from 23% under mild bias to less than 1% under severe bias. A data-adaptive approach that estimates the selection probability from the observed p-value distribution could substantially improve TGEP's bias correction under strong selection.
 
 ### SE Underestimation
 
@@ -403,7 +411,11 @@ Bootstrap SE (B = 200, available as a default option) provides a more accurate v
 
 7. **Number of guards**: The three-guard architecture is fixed. Whether the optimal number of guards differs across settings is unknown.
 
-8. **Cochrane dataset selection**: The 15 empirical validation datasets were selected for availability and diversity, not by a systematic protocol. Future work should evaluate TGEP on a pre-registered set of datasets with known bias characteristics.
+8. **Cochrane dataset selection**: The 15 empirical validation datasets were selected for availability and diversity (Cochrane reviews published 2020-2025, with K >= 5 studies and log odds ratio as effect measure), not by a systematic protocol. Future work should evaluate TGEP on a pre-registered set of datasets with known bias characteristics.
+
+9. **Effect measure scope**: The simulation study evaluated only standardized mean differences (SMD). The empirical validation used log odds ratios, which have different distributional properties. The generalizability of the simulation findings to the log OR scale was not formally established.
+
+10. **Divergent TGEP estimates**: In 3 of 15 empirical datasets (CD008493, CD013055, CD014960), TGEP moved the point estimate away from zero relative to REML, contrary to the expected bias-reduction direction. This can occur when the GRMA or WRD guards identify influential studies on the opposite side of the estimate distribution. Users should interpret TGEP as a data-adaptive reweighting, not a guaranteed bias reduction.
 
 ### Recommendations for Practice
 
@@ -411,8 +423,12 @@ Based on our findings, we recommend TGEP as a **complementary sensitivity analys
 
 - Use **HKSJ** as the primary method for inference (confidence intervals and hypothesis tests), given its consistently near-nominal coverage.
 - Use **PET-PEESE** when funnel plot asymmetry or other evidence suggests significance-based publication bias, noting its overcorrection risk in unbiased settings.
-- Use **TGEP** to provide a bias-reduced point estimate and to examine guard weight diagnostics as informal indicators of potential bias or outlier contamination. When TGEP's SWA guard receives high weight, this suggests the data may be affected by publication bias; when GRMA receives high weight, outlier or small-study effects may be present.
-- Report individual guard estimates and weights alongside the ensemble result to support transparency.
+- Use **TGEP** to provide a bias-reduced point estimate and to examine guard weight diagnostics as informal indicators of potential bias or outlier contamination:
+  - When SWA weight exceeds 0.5, this suggests the data may be affected by publication bias (more non-significant studies are being up-weighted).
+  - When GRMA weight exceeds 0.5, outlier or small-study effects may be present.
+  - When |TGEP - REML| exceeds 0.10 on the SMD scale (or 10% of the REML estimate for other scales), publication bias or outlier contamination should be investigated further using dedicated methods (funnel plots, Egger's test, leave-one-out diagnostics).
+- Report individual guard estimates and weights alongside the ensemble result, e.g., in a supplementary table or sensitivity analysis section.
+- TGEP results should appear in the sensitivity analysis section of a systematic review report, not as the primary estimate in the main forest plot.
 
 The default temperature T = 1.0 is suitable for most applications. Bootstrap SE (n_boot >= 200) should be used when confidence intervals from TGEP are needed.
 
@@ -454,6 +470,10 @@ TGEP provides a frequentist ensemble framework for meta-analysis that produces l
 
 [16] R Core Team. R: A language and environment for statistical computing. Vienna: R Foundation for Statistical Computing; 2025. https://www.R-project.org/
 
+[17] Sidik K, Jonkman JN. A simple confidence interval for meta-analysis. Stat Med. 2002;21(21):3153-3159. doi:10.1002/sim.1262
+
+[18] IntHout J, Ioannidis JPA, Borm GF. The Hartung-Knapp-Sidik-Jonkman method for random effects meta-analysis is straightforward and considerably outperforms the standard DerSimonian-Laird method. BMC Med Res Methodol. 2014;14:25. doi:10.1186/1471-2288-14-25
+
 ---
 
 ## Supporting Information
@@ -466,7 +486,7 @@ TGEP provides a frequentist ensemble framework for meta-analysis that produces l
 
 **S4 File.** Cochrane dataset identifiers and empirical validation results (Real_World_Impact_Summary.txt).
 
-**S5 File.** Test suite (test_tgep.R) with 23 unit tests covering basic functionality, edge cases, and numerical stability.
+**S5 File.** Test suite (test_tgep.R) with 30 assertions across 17 test groups covering basic functionality, edge cases, input validation, and numerical stability.
 
 ---
 
@@ -479,7 +499,7 @@ TGEP provides a frequentist ensemble framework for meta-analysis that produces l
 Mahmood Ul Hassan (mahmood.hassan@example.com)
 
 ### Author Contributions (CRediT)
-**Conceptualization:** MUH. **Methodology:** MUH. **Software:** MUH. **Validation:** MUH. **Formal Analysis:** MUH. **Investigation:** MUH. **Data Curation:** MUH. **Writing - Original Draft:** MUH. **Writing - Review & Editing:** MUH. **Visualization:** MUH.
+**Conceptualization:** Mahmood Ul Hassan. **Methodology:** Mahmood Ul Hassan. **Software:** Mahmood Ul Hassan. **Validation:** Mahmood Ul Hassan. **Formal Analysis:** Mahmood Ul Hassan. **Investigation:** Mahmood Ul Hassan. **Data Curation:** Mahmood Ul Hassan. **Writing - Original Draft:** Mahmood Ul Hassan. **Writing - Review & Editing:** Mahmood Ul Hassan. **Visualization:** Mahmood Ul Hassan.
 
 ### Data Availability Statement
 All simulation code and results are provided as Supporting Information. The Cochrane datasets used for empirical validation are identified by their Cochrane review identifiers (CD-numbers) and are publicly available through the Cochrane Library (https://www.cochranelibrary.com/). The TGEP R package is available at [ZENODO_DOI_PLACEHOLDER].

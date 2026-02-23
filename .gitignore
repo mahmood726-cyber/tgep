@@ -3,7 +3,7 @@ __pycache__/
 .Rhistory
 .RData
 .Rproj.user/
-output/
+output/*.log
 *.egg-info/
 .serena/
 .claude/

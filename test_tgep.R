@@ -1,6 +1,6 @@
 if (!requireNamespace("metafor", quietly = TRUE)) stop("metafor required")
 library(metafor)
-source("C:/Models/TGEP_Development/R/TGEP.R")
+source(file.path(getwd(), "R", "TGEP.R"))
 
 n_pass <- 0; n_fail <- 0
 check <- function(name, cond) {
@@ -104,6 +104,21 @@ cat("=== Test 15: tau2 = 0 scenario ===\n")
 yi_homo <- rnorm(10, 0.3, sqrt(0.05)); vi_homo <- rep(0.05, 10)
 res_homo <- tgep_meta(yi_homo, vi_homo, n_boot = 0)
 check("tau2=0: runs", is.finite(res_homo$estimate))
+
+cat("=== Test 16: K=1 SE and CI are finite ===\n")
+res1_full <- tgep_meta(yi[1], vi[1], n_boot = 0)
+check("k=1 SE finite", is.finite(res1_full$se))
+check("k=1 CI_lb finite", is.finite(res1_full$ci_lb))
+check("k=1 CI_ub finite", is.finite(res1_full$ci_ub))
+check("k=1 CI width > 0", res1_full$ci_ub > res1_full$ci_lb)
+
+cat("=== Test 17: Input validation ===\n")
+err1 <- tryCatch(tgep_meta(yi[1:3], vi[1:2], n_boot = 0), error = function(e) e$message)
+check("length mismatch caught", grepl("same length", err1))
+err2 <- tryCatch(tgep_meta(c(0.3, NA, 0.1), vi[1:3], n_boot = 0), error = function(e) e$message)
+check("NA input caught", grepl("finite", err2))
+err3 <- tryCatch(tgep_meta(yi[1:3], c(0.05, -0.01, 0.05), n_boot = 0), error = function(e) e$message)
+check("negative vi caught", grepl("positive", err3))
 
 cat(sprintf("\n=== Results: %d PASS, %d FAIL ===\n", n_pass, n_fail))
 if (n_fail > 0) stop(sprintf("%d test(s) failed!", n_fail))

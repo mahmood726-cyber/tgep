@@ -13,7 +13,7 @@ NULL
 
 grma_guard_core <- function(y, v, zeta = 0.5) {
   n <- length(y)
-  if (n < 2) return(list(est = median(y), var = var(y)/n))
+  if (n < 2) return(list(est = y[1], var = v[1]))
   prec <- 1.0 / v
   log_prec <- log(prec + 1.0)
   robust_scale <- function(x) {
@@ -42,7 +42,7 @@ grma_guard_core <- function(y, v, zeta = 0.5) {
 }
 
 wrd_guard_core <- function(y, v, threshold = 2.5) {
-  if (length(y) < 2) return(list(est = median(y), var = var(y)/length(y)))
+  if (length(y) < 2) return(list(est = y[1], var = v[1]))
   fit <- tryCatch(rma(y, v, method = "REML"), error = function(e) list(beta = median(y), tau2 = var(y)/2))
   est <- as.numeric(fit$beta); tau2 <- if(is.null(fit$tau2) || is.na(fit$tau2)) 0 else fit$tau2
   z <- (y - est) / sqrt(v + tau2)
@@ -52,7 +52,7 @@ wrd_guard_core <- function(y, v, threshold = 2.5) {
 }
 
 swa_guard_core <- function(y, v, p_cutoff = 0.05) {
-  if (length(y) < 2) return(list(est = median(y), var = var(y)/length(y)))
+  if (length(y) < 2) return(list(est = y[1], var = v[1]))
   fit <- tryCatch(rma(y, v, method = "REML"), error = function(e) list(beta = median(y), tau2 = var(y)/2))
   est <- as.numeric(fit$beta); tau2 <- if(is.null(fit$tau2) || is.na(fit$tau2)) 0 else fit$tau2
   # Use marginal p-value (within-study variance only) to match how
@@ -68,7 +68,10 @@ swa_guard_core <- function(y, v, p_cutoff = 0.05) {
 # TGEP CORE
 # ============================================================================
 
-tgep_meta <- function(yi, vi, n_boot = 100, temperature = 1.0, n_cores = 1, conf.level = 0.95) {
+tgep_meta <- function(yi, vi, n_boot = 200, temperature = 1.0, n_cores = 1, conf.level = 0.95) {
+  if (length(yi) != length(vi)) stop("yi and vi must have the same length")
+  if (any(!is.finite(yi)) || any(!is.finite(vi))) stop("yi and vi must be finite (no NA/NaN/Inf)")
+  if (any(vi <= 0)) stop("vi must be strictly positive")
   k <- length(yi)
   guards <- list(GRMA = grma_guard_core, WRD = wrd_guard_core, SWA = swa_guard_core)
   
@@ -134,8 +137,7 @@ tgep_meta <- function(yi, vi, n_boot = 100, temperature = 1.0, n_cores = 1, conf
 # DIAGNOSTICS & PLOTTING
 # ============================================================================
 
-compare_tgep <- function(yi, vi, n_boot = 100, temperature = 1.0, conf.level = 0.95) {
-  z_crit <- qnorm(1 - (1 - conf.level) / 2)
+compare_tgep <- function(yi, vi, n_boot = 200, temperature = 1.0, conf.level = 0.95) {
   tgep_res <- tgep_meta(yi, vi, n_boot = n_boot, temperature = temperature, conf.level = conf.level)
   reml_fit <- tryCatch(rma(yi, vi, method = "REML"), error = function(e) NULL)
   hksj_fit <- tryCatch(rma(yi, vi, method = "REML", test = "knha"), error = function(e) NULL)

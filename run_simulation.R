@@ -2,7 +2,7 @@
 # TGEP Comprehensive Simulation Study (ADEMP Framework)
 # Author: Mahmood Ul Hassan
 # Date: 2026-02-23
-# Version: 2.0 — fixed DGM, 1000 reps, added trim-and-fill & PET-PEESE
+# Version: 2.0 — fixed DGM, 500 reps, added trim-and-fill & PET-PEESE
 #
 # ADEMP:
 #   Aims: Compare TGEP vs REML, HKSJ, Trim-and-Fill, PET-PEESE under bias
@@ -12,7 +12,7 @@
 #   Performance: Bias, RMSE, Coverage, MCSE, SE ratio
 
 library(metafor)
-source("C:/Models/TGEP_Development/R/TGEP.R")
+source(file.path(getwd(), "R", "TGEP.R"))
 
 set.seed(20260223)
 N_SIM <- 500
@@ -193,8 +193,8 @@ metrics <- compute_metrics(results_df)
 rownames(metrics) <- NULL
 
 # Save
-dir.create("C:/Models/TGEP_Development/output", showWarnings = FALSE)
-write.csv(metrics, "C:/Models/TGEP_Development/output/simulation_results.csv", row.names = FALSE)
+dir.create(file.path(getwd(), "output"), showWarnings = FALSE)
+write.csv(metrics, file.path(getwd(), "output", "simulation_results.csv"), row.names = FALSE)
 
 # Print summary
 cat("\n=== SIMULATION SUMMARY ===\n")
