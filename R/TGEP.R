@@ -3,8 +3,9 @@
 #' @author Mahmood Ul Hassan
 #' @date 2026-02-15
 
-library(metafor)
-library(parallel)
+#' @import metafor
+#' @importFrom parallel mclapply
+NULL
 
 # ============================================================================
 # GUARD CORES (Returning both Estimate and estimated Variance)
@@ -29,7 +30,12 @@ grma_guard_core <- function(y, v, zeta = 0.5) {
   a_pre <- pmin(pmax((log(a_p + 1.0) - q_p[1]) / (q_p[2] - q_p[1] + 1e-12), 0.0), 1.0)
   delta_eff <- abs(x_eff - a_eff); delta_pre <- abs(x_pre - a_pre)
   d_min <- min(c(delta_eff, delta_pre)); d_max <- max(c(delta_eff, delta_pre))
-  grc <- ((d_min + zeta * d_max) / (delta_eff + zeta * d_max) + 
+  if (d_max < 1e-12) {
+    # All studies identical — equal weighting
+    w <- rep(1/n, n)
+    return(list(est = sum(w * y), var = sum(w^2 * v)))
+  }
+  grc <- ((d_min + zeta * d_max) / (delta_eff + zeta * d_max) +
           (d_min + zeta * d_max) / (delta_pre + zeta * d_max)) / 2.0
   w <- grc / sum(grc)
   list(est = sum(w * y), var = sum(w^2 * v))
@@ -49,7 +55,9 @@ swa_guard_core <- function(y, v, p_cutoff = 0.05) {
   if (length(y) < 2) return(list(est = median(y), var = var(y)/length(y)))
   fit <- tryCatch(rma(y, v, method = "REML"), error = function(e) list(beta = median(y), tau2 = var(y)/2))
   est <- as.numeric(fit$beta); tau2 <- if(is.null(fit$tau2) || is.na(fit$tau2)) 0 else fit$tau2
-  p <- 2 * (1 - pnorm(abs(y / sqrt(v + tau2))))
+  # Use marginal p-value (within-study variance only) to match how
+  # publication decisions are made in practice
+  p <- 2 * (1 - pnorm(abs(y / sqrt(v))))
   w_iv <- 1 / (v + tau2)
   w_swa <- w_iv / ifelse(p < p_cutoff, 1.0, 0.4)
   w_norm <- w_swa / sum(w_swa)
@@ -76,7 +84,7 @@ tgep_meta <- function(yi, vi, n_boot = 100, temperature = 1.0, n_cores = 1, conf
     ests <- sapply(guard_results, function(r) r$est)
     vars <- sapply(guard_results, function(r) r$var)
     
-    if (kk < 3) return(list(est = median(y), weights = rep(1/3, 3), guard_ests = ests, guard_vars = vars))
+    if (kk < 3) return(list(est = mean(ests), weights = rep(1/3, 3), guard_ests = ests, guard_vars = vars))
     
     loo_errs <- matrix(0, nrow = kk, ncol = 3)
     for (i in 1:kk) {

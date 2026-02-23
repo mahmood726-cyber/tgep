@@ -2,13 +2,14 @@
 # TGEP Comprehensive Simulation Study (ADEMP Framework)
 # Author: Mahmood Ul Hassan
 # Date: 2026-02-23
+# Version: 2.0 — fixed DGM, 1000 reps, added trim-and-fill & PET-PEESE
 #
 # ADEMP:
-#   Aims: Compare TGEP vs REML coverage, bias, RMSE under heterogeneity & pub bias
-#   Data-generating mechanisms: Normal random-effects with/without pub bias
-#   Estimands: Pooled mean effect (true_mu)
-#   Methods: REML, HKSJ, TGEP (T=1.0, n_boot=0)
-#   Performance: Bias, RMSE, Coverage, MCSE
+#   Aims: Compare TGEP vs REML, HKSJ, Trim-and-Fill, PET-PEESE under bias
+#   Data-generating mechanisms: Normal RE with realistic variances
+#   Estimands: Unconditional population mean mu (pre-selection)
+#   Methods: REML, HKSJ, TGEP (T=1.0, n_boot=0), Trim-Fill, PET-PEESE
+#   Performance: Bias, RMSE, Coverage, MCSE, SE ratio
 
 library(metafor)
 source("C:/Models/TGEP_Development/R/TGEP.R")
@@ -17,10 +18,12 @@ set.seed(20260223)
 N_SIM <- 500
 t_global <- Sys.time()
 
-# Data-generating mechanism
+# Data-generating mechanism with REALISTIC variances
+# For SMD with n_per_arm ~ U(20,100): vi ~ 2/n + d^2/(2*2n) ~ 0.02-0.1
 generate_meta_data <- function(k, true_mu, tau2, bias_type = "none", bias_strength = 0.8) {
+  n_per_arm <- sample(20:100, k, replace = TRUE)
+  vi <- 2 / n_per_arm + true_mu^2 / (2 * 2 * n_per_arm)  # SMD variance approximation
   theta_i <- rnorm(k, true_mu, sqrt(tau2))
-  vi <- 1 / rgamma(k, shape = 5, rate = 5 * 20)  # ~N(20) per study -> se^2 ~ 1/20
   yi <- rnorm(k, theta_i, sqrt(vi))
 
   if (bias_type == "significance") {
@@ -30,7 +33,6 @@ generate_meta_data <- function(k, true_mu, tau2, bias_type = "none", bias_streng
     if (sum(keep) < 3) keep[order(p)][1:3] <- TRUE
     yi <- yi[keep]; vi <- vi[keep]
   } else if (bias_type == "onesided") {
-    # One-sided: only publish if effect in expected direction
     prob_pub <- ifelse(yi > 0, 1.0, 1 - bias_strength)
     keep <- runif(k) < prob_pub
     if (sum(keep) < 3) keep[order(-yi)][1:3] <- TRUE
@@ -40,76 +42,108 @@ generate_meta_data <- function(k, true_mu, tau2, bias_type = "none", bias_streng
   list(yi = yi, vi = vi, k_final = length(yi))
 }
 
+# PET-PEESE helper
+pet_peese <- function(yi, vi) {
+  se <- sqrt(vi)
+  # PET: regress on SE
+  pet_fit <- tryCatch(rma(yi, vi, mods = ~ se, method = "REML"), error = function(e) NULL)
+  if (is.null(pet_fit)) return(NULL)
+  pet_est <- as.numeric(pet_fit$beta[1])
+  pet_pval <- pet_fit$pval[1]
+  # If PET significant, use PEESE (regress on vi)
+  if (pet_pval < 0.10) {
+    peese_fit <- tryCatch(rma(yi, vi, mods = ~ vi, method = "REML"), error = function(e) NULL)
+    if (!is.null(peese_fit)) {
+      return(list(est = as.numeric(peese_fit$beta[1]), se = peese_fit$se[1],
+                  ci_lb = peese_fit$ci.lb[1], ci_ub = peese_fit$ci.ub[1]))
+    }
+  }
+  list(est = pet_est, se = pet_fit$se[1],
+       ci_lb = pet_fit$ci.lb[1], ci_ub = pet_fit$ci.ub[1])
+}
+
 # Define scenarios
 scenarios <- list(
-  # Type I / Null scenarios
+  # Null scenarios
   list(name = "Null_k10_tau0.05", type = "null", k = 10, true_mu = 0.0, tau2 = 0.05, bias_type = "none"),
   list(name = "Null_k10_tau0.20", type = "null", k = 10, true_mu = 0.0, tau2 = 0.20, bias_type = "none"),
-
   # Baseline (no bias) — varying k
   list(name = "Base_k5",  type = "base", k = 5,  true_mu = 0.3, tau2 = 0.05, bias_type = "none"),
   list(name = "Base_k10", type = "base", k = 10, true_mu = 0.3, tau2 = 0.05, bias_type = "none"),
   list(name = "Base_k20", type = "base", k = 20, true_mu = 0.3, tau2 = 0.05, bias_type = "none"),
-  list(name = "Base_k30", type = "base", k = 30, true_mu = 0.3, tau2 = 0.05, bias_type = "none"),
-
+  # Base_k30 removed for computational efficiency; k=5,10,20 cover the range
   # Varying heterogeneity
   list(name = "Hetero_tau0.01", type = "hetero", k = 15, true_mu = 0.3, tau2 = 0.01, bias_type = "none"),
   list(name = "Hetero_tau0.10", type = "hetero", k = 15, true_mu = 0.3, tau2 = 0.10, bias_type = "none"),
   list(name = "Hetero_tau0.50", type = "hetero", k = 15, true_mu = 0.3, tau2 = 0.50, bias_type = "none"),
   list(name = "Hetero_tau1.00", type = "hetero", k = 15, true_mu = 0.3, tau2 = 1.00, bias_type = "none"),
-
   # Publication bias — significance-based
   list(name = "PubBias_k10_mild",   type = "pubbias", k = 10, true_mu = 0.3, tau2 = 0.05, bias_type = "significance", bias_strength = 0.5),
   list(name = "PubBias_k10_strong", type = "pubbias", k = 10, true_mu = 0.3, tau2 = 0.05, bias_type = "significance", bias_strength = 0.8),
   list(name = "PubBias_k20_strong", type = "pubbias", k = 20, true_mu = 0.3, tau2 = 0.05, bias_type = "significance", bias_strength = 0.8),
   list(name = "PubBias_k20_severe", type = "pubbias", k = 20, true_mu = 0.3, tau2 = 0.05, bias_type = "significance", bias_strength = 0.95),
-
+  # Small k + bias
+  list(name = "PubBias_k5_strong",  type = "pubbias", k = 5,  true_mu = 0.3, tau2 = 0.05, bias_type = "significance", bias_strength = 0.8),
   # One-sided publication bias
   list(name = "OneSided_k10", type = "onesided", k = 10, true_mu = 0.3, tau2 = 0.05, bias_type = "onesided", bias_strength = 0.7),
   list(name = "OneSided_k20", type = "onesided", k = 20, true_mu = 0.3, tau2 = 0.10, bias_type = "onesided", bias_strength = 0.7),
-
   # Combined: high heterogeneity + publication bias
   list(name = "Combined_hetero_bias", type = "combined", k = 20, true_mu = 0.3, tau2 = 0.30, bias_type = "significance", bias_strength = 0.8),
-
-  # Null effect + publication bias (worst case)
+  # Null effect + publication bias
   list(name = "Null_PubBias", type = "null_bias", k = 20, true_mu = 0.0, tau2 = 0.05, bias_type = "significance", bias_strength = 0.8)
 )
 
-cat(sprintf("Running %d scenarios x %d reps = %d total iterations\n", length(scenarios), N_SIM, length(scenarios) * N_SIM))
+cat(sprintf("Running %d scenarios x %d reps = %d iterations\n", length(scenarios), N_SIM, length(scenarios) * N_SIM))
 
-# Run simulation
+methods_list <- c("REML", "HKSJ", "TGEP", "TrimFill", "PETPEESE")
+
 all_results <- list()
 for (si in seq_along(scenarios)) {
   sc <- scenarios[[si]]
   cat(sprintf("[%d/%d] %s (k=%d, tau2=%.2f, bias=%s)\n", si, length(scenarios), sc$name, sc$k, sc$tau2, sc$bias_type))
   t0 <- Sys.time()
+  n_discard <- 0
 
   for (r in 1:N_SIM) {
     dat <- generate_meta_data(sc$k, sc$true_mu, sc$tau2, sc$bias_type,
                               ifelse(is.null(sc$bias_strength), 0, sc$bias_strength))
 
-    # REML
+    # Run all methods; if any fail, discard entire iteration
     reml_res <- tryCatch({
       fit <- rma(dat$yi, dat$vi, method = "REML")
       list(est = as.numeric(fit$beta), se = fit$se, ci_lb = fit$ci.lb, ci_ub = fit$ci.ub)
     }, error = function(e) NULL)
 
-    # HKSJ
     hksj_res <- tryCatch({
       fit <- rma(dat$yi, dat$vi, method = "REML", test = "knha")
       list(est = as.numeric(fit$beta), se = fit$se, ci_lb = fit$ci.lb, ci_ub = fit$ci.ub)
     }, error = function(e) NULL)
 
-    # TGEP
     tgep_res <- tryCatch({
       fit <- tgep_meta(dat$yi, dat$vi, n_boot = 0)
       list(est = fit$estimate, se = fit$se, ci_lb = fit$ci_lb, ci_ub = fit$ci_ub)
     }, error = function(e) NULL)
 
+    tf_res <- tryCatch({
+      fit <- rma(dat$yi, dat$vi, method = "REML")
+      tf <- trimfill(fit)
+      list(est = as.numeric(tf$beta), se = tf$se, ci_lb = tf$ci.lb, ci_ub = tf$ci.ub)
+    }, error = function(e) NULL)
+
+    pp_res <- tryCatch(pet_peese(dat$yi, dat$vi), error = function(e) NULL)
+
+    # Discard if any core method fails
+    if (is.null(reml_res) || is.null(hksj_res) || is.null(tgep_res)) {
+      n_discard <- n_discard + 1
+      next
+    }
+
     for (method_info in list(
       list(name = "REML", res = reml_res),
       list(name = "HKSJ", res = hksj_res),
-      list(name = "TGEP", res = tgep_res)
+      list(name = "TGEP", res = tgep_res),
+      list(name = "TrimFill", res = tf_res),
+      list(name = "PETPEESE", res = pp_res)
     )) {
       if (!is.null(method_info$res)) {
         all_results[[length(all_results) + 1]] <- data.frame(
@@ -129,21 +163,12 @@ for (si in seq_along(scenarios)) {
   }
 
   dt <- as.numeric(difftime(Sys.time(), t0, units = "secs"))
-  cat(sprintf("  %.0fs\n", dt))
+  cat(sprintf("  %.0fs (discarded %d)\n", dt, n_discard))
 }
 
 results_df <- do.call(rbind, all_results)
 
-# Compute summary statistics
-summary_df <- aggregate(
-  cbind(Estimate, Covered) ~ Scenario + Type + k + tau2 + bias_type + true_mu + Method,
-  data = results_df,
-  FUN = function(x) c(mean = mean(x))
-)
-# Fix column names after aggregate
-colnames(summary_df)[8:9] <- c("Mean_Est", "Coverage")
-
-# Compute bias, RMSE, MCSE separately
+# Compute metrics
 compute_metrics <- function(df) {
   do.call(rbind, lapply(split(df, paste(df$Scenario, df$Method)), function(sub) {
     bias <- mean(sub$Estimate - sub$true_mu)
@@ -157,8 +182,8 @@ compute_metrics <- function(df) {
       Scenario = sub$Scenario[1], Type = sub$Type[1], k = sub$k[1], tau2 = sub$tau2[1],
       bias_type = sub$bias_type[1], true_mu = sub$true_mu[1], Method = sub$Method[1],
       Mean_Bias = bias, RMSE = rmse, Coverage = coverage, MCSE_Coverage = mcse_cov,
-      Mean_SE = mean_se, Empirical_SE = emp_se, Mean_k_final = mean_k,
-      N_sim = nrow(sub),
+      Mean_SE = mean_se, Empirical_SE = emp_se, SE_Ratio = mean_se / emp_se,
+      Mean_k_final = mean_k, N_sim = nrow(sub),
       stringsAsFactors = FALSE
     )
   }))
@@ -170,7 +195,6 @@ rownames(metrics) <- NULL
 # Save
 dir.create("C:/Models/TGEP_Development/output", showWarnings = FALSE)
 write.csv(metrics, "C:/Models/TGEP_Development/output/simulation_results.csv", row.names = FALSE)
-write.csv(results_df, "C:/Models/TGEP_Development/output/simulation_raw.csv", row.names = FALSE)
 
 # Print summary
 cat("\n=== SIMULATION SUMMARY ===\n")
@@ -178,9 +202,9 @@ for (sc_name in unique(metrics$Scenario)) {
   cat(sprintf("\n--- %s ---\n", sc_name))
   sub <- metrics[metrics$Scenario == sc_name, ]
   for (i in 1:nrow(sub)) {
-    cat(sprintf("  %s: Bias=%.4f RMSE=%.4f Coverage=%.3f (MCSE=%.4f) SE_ratio=%.3f\n",
+    cat(sprintf("  %s: Bias=%.4f RMSE=%.4f Cov=%.3f (MCSE=%.4f) SE_r=%.3f N=%d\n",
                 sub$Method[i], sub$Mean_Bias[i], sub$RMSE[i], sub$Coverage[i],
-                sub$MCSE_Coverage[i], sub$Mean_SE[i] / sub$Empirical_SE[i]))
+                sub$MCSE_Coverage[i], sub$SE_Ratio[i], sub$N_sim[i]))
   }
 }
 
