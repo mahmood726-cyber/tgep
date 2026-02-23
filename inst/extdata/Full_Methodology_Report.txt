@@ -1,0 +1,39 @@
+TGEP COMPREHENSIVE EVALUATION REPORT
+====================================
+
+1. ABLATION STUDY (Impact of individual guards)
+----------------------------------------------
+Full Ensemble Estimate:   -0.0967
+No Bias Guard (SWA):      -0.0977 (Diff: -0.0010)
+No Outlier Guard (WRD):   -0.0766 (Diff: 0.0201)
+
+2. SOFTMAX TEMPERATURE TUNING
+-----------------------------
+T=0.1 (Aggressive Selector) Weights:
+ GRMA   WRD   SWA 
+0.000 0.754 0.246 
+Estimate (T=0.1): -0.1169
+
+T=10.0 (Equal Weights) Weights:
+ GRMA   WRD   SWA 
+0.313 0.346 0.342 
+Estimate (T=10.0): -0.0836
+
+3. SIMULATION STUDY (Bias, RMSE, Coverage)
+------------------------------------------
+Running Scenario: Small k, Low Hetero 
+Running Scenario: Med k, High Hetero 
+Running Scenario: Med k, Pub Bias 
+              scenario method   Mean_Bias      RMSE Coverage
+                <char> <char>       <num>     <num>    <num>
+1: Small k, Low Hetero   REML  0.00614556 0.1337625     0.96
+2: Small k, Low Hetero   TGEP -0.01563457 0.1201891     0.98
+3:  Med k, High Hetero   REML -0.01103523 0.1349913     0.88
+4:  Med k, High Hetero   TGEP -0.02847890 0.1334779     1.00
+5:     Med k, Pub Bias   REML  0.16451223 0.2112433     0.72
+6:     Med k, Pub Bias   TGEP  0.15181347 0.1979349     0.90
+
+Conclusion:
+TGEP demonstrates superior coverage in the presence of Publication Bias,
+and remains competitive with REML in baseline scenarios while providing
+built-in protection against outliers through its adaptive weighting.

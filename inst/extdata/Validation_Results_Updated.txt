@@ -1,0 +1,26 @@
+TGEP VALIDATION REPORT (UPDATED)
+================================
+
+Dataset: CD000028_pub4_data
+Analysis: All-cause mortality
+Studies: 5
+
+ENSEMBLE SUMMARY:
+----------------
+Final TGEP Estimate: -0.0982 (SE: 0.1332)
+95% CI: [-0.3592, 0.1629]
+P-value: 0.4610
+
+GUARD PERFORMANCE:
+------------------
+  Guard    Estimate    Weight  CV_Error
+1  GRMA -0.09087722 0.4181876 0.9449059
+2   WRD -0.13075624 0.1564735 1.0391935
+3   SWA -0.09338318 0.4253390 0.9432796
+
+METHOD COMPARISON:
+------------------
+  Method    Estimate         SE   CI_Lower   CI_Upper     PValue
+1   REML -0.13075624 0.07295042 -0.2737364 0.01222396 0.07306913
+2   HKSJ -0.13075624 0.05906261 -0.2947403 0.03322784 0.09123344
+3   TGEP -0.09818311 0.06278124 -0.2212343 0.02486811 0.11784279

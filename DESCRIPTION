@@ -1,0 +1,9 @@
+Package: TGEP
+Title: Triple-Guard Ensemble Pooling for Meta-Analysis
+Version: 0.1.0
+Authors@R: person("Mahmood Ul", "Hassan", email = "mahmood.hassan@example.com", role = c("aut", "cre"))
+Description: Implements a robust frequentist ensemble methodology for meta-analysis using three specialized guards (GRMA, WRD, SWA) integrated via LOO-CV stacking.
+Depends: R (>= 4.0), metafor, parallel
+License: MIT
+Encoding: UTF-8
+LazyData: true

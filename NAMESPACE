@@ -1,0 +1,6 @@
+export(tgep_meta)
+export(compare_tgep)
+export(plot_sparsity)
+S3method(plot, tgep)
+import(metafor)
+import(parallel)
