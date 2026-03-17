@@ -72,7 +72,9 @@ tgep_meta <- function(yi, vi, n_boot = 200, temperature = 1.0, n_cores = 1, conf
   if (length(yi) != length(vi)) stop("yi and vi must have the same length")
   if (any(!is.finite(yi)) || any(!is.finite(vi))) stop("yi and vi must be finite (no NA/NaN/Inf)")
   if (any(vi <= 0)) stop("vi must be strictly positive")
+  if (temperature <= 0) stop("temperature must be positive")
   k <- length(yi)
+  if (k == 1) n_boot <- 0  # bootstrap uninformative for single study
   guards <- list(GRMA = grma_guard_core, WRD = wrd_guard_core, SWA = swa_guard_core)
   
   get_weights <- function(errors, temp) {
@@ -139,8 +141,8 @@ tgep_meta <- function(yi, vi, n_boot = 200, temperature = 1.0, n_cores = 1, conf
 
 compare_tgep <- function(yi, vi, n_boot = 200, temperature = 1.0, conf.level = 0.95) {
   tgep_res <- tgep_meta(yi, vi, n_boot = n_boot, temperature = temperature, conf.level = conf.level)
-  reml_fit <- tryCatch(rma(yi, vi, method = "REML"), error = function(e) NULL)
-  hksj_fit <- tryCatch(rma(yi, vi, method = "REML", test = "knha"), error = function(e) NULL)
+  reml_fit <- tryCatch(rma(yi, vi, method = "REML", level = conf.level * 100), error = function(e) NULL)
+  hksj_fit <- tryCatch(rma(yi, vi, method = "REML", test = "knha", level = conf.level * 100), error = function(e) NULL)
   rows <- list(data.frame(
     Method = "TGEP", Estimate = tgep_res$estimate, SE = tgep_res$se,
     CI_Lower = tgep_res$ci_lb, CI_Upper = tgep_res$ci_ub, PValue = tgep_res$pvalue,
@@ -175,6 +177,19 @@ plot.tgep <- function(x, ...) {
   axis(2, at=1:4, labels=names(ests), las=1)
   segments(x$ci_lb, 4, x$ci_ub, 4, col="red", lwd=2)
   par(mfrow=c(1,1))
+}
+
+print.tgep <- function(x, ...) {
+  cat("Triple-Guard Ensemble Pooling (TGEP)\n")
+  cat(sprintf("  Estimate: %.4f (SE = %.4f)\n", x$estimate, x$se))
+  cat(sprintf("  %.0f%% CI: [%.4f, %.4f]\n", x$conf.level * 100, x$ci_lb, x$ci_ub))
+  cat(sprintf("  p-value: %.4f\n", x$pvalue))
+  cat(sprintf("  Guard weights: GRMA=%.3f, WRD=%.3f, SWA=%.3f\n",
+              x$weights[1], x$weights[2], x$weights[3]))
+  cat(sprintf("  Guard estimates: GRMA=%.4f, WRD=%.4f, SWA=%.4f\n",
+              x$guards[1], x$guards[2], x$guards[3]))
+  cat(sprintf("  Studies: k=%d, Temperature: %.2f\n", x$k, x$temp))
+  invisible(x)
 }
 
 plot_sparsity <- function(yi, vi, temps = c(0.01, 0.1, 0.5, 1, 5, 10)) {

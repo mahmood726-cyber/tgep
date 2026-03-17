@@ -1,12 +1,22 @@
 # Run Validation for TGEP Methodology (Updated)
 library(metafor)
-source("C:/Models/TGEP_Development/TGEP.R")
+
+# Use system.file() when installed as package, or source from project root
+if (requireNamespace("TGEP", quietly = TRUE)) {
+  library(TGEP)
+} else {
+  source(file.path(getwd(), "R", "TGEP.R"))
+}
 
 cat("=== TGEP Validation Run (Fully Adaptive) ===\n")
 
 # 1. Load Data
-# Using local path if possible, or same absolute if required by data location
-load("C:/Users/user/OneDrive - NHS/Documents/Pairwise70/data/CD000028_pub4_data.rda")
+# Expects CD000028_pub4_data.rda in the working directory or a user-specified path.
+# To use: place the .rda file in getwd(), or set DATA_PATH before sourcing this script.
+data_path <- Sys.getenv("TGEP_DATA_PATH", unset = file.path(getwd(), "CD000028_pub4_data.rda"))
+if (!file.exists(data_path)) stop("Data file not found: ", data_path,
+                                   "\nSet TGEP_DATA_PATH environment variable or place file in working directory.")
+load(data_path)
 df <- CD000028_pub4_data
 
 # 2. Extract a specific meta-analysis
@@ -14,9 +24,9 @@ ma_data <- df[df$Analysis.number == 1, ]
 cat(sprintf("Selected Analysis: %s (k = %d)\n", ma_data$Analysis.name[1], nrow(ma_data)))
 
 # 3. Calculate effect sizes (Log OR)
-dat <- escalc(measure="OR", 
+dat <- escalc(measure="OR",
               ai=Experimental.cases, n1i=Experimental.N,
-              ci=Control.cases, n2i=Control.N, 
+              ci=Control.cases, n2i=Control.N,
               data=ma_data)
 
 dat <- dat[!is.na(dat$yi) & !is.na(dat$vi), ][1:5, ]
@@ -29,7 +39,9 @@ results <- compare_tgep(dat$yi, dat$vi)
 # 5. Print Results
 print(results)
 
-sink("C:/Models/TGEP_Development/Validation_Results_Updated.txt")
+output_path <- file.path(getwd(), "output", "Validation_Results_Updated.txt")
+dir.create(dirname(output_path), showWarnings = FALSE, recursive = TRUE)
+sink(output_path)
 cat("TGEP VALIDATION REPORT (UPDATED)\n")
 cat("================================\n\n")
 cat(sprintf("Dataset: CD000028_pub4_data\n"))
@@ -45,10 +57,9 @@ cat(sprintf("P-value: %.4f\n\n", tgep_res$pvalue))
 cat("GUARD PERFORMANCE:\n")
 cat("------------------\n")
 diag_df <- data.frame(
-  Guard = names(tgep_res$guard_estimates),
-  Estimate = as.numeric(tgep_res$guard_estimates),
-  Weight = as.numeric(tgep_res$ensemble_weights),
-  CV_Error = as.numeric(tgep_res$cv_scores)
+  Guard = names(tgep_res$guards),
+  Estimate = as.numeric(tgep_res$guards),
+  Weight = as.numeric(tgep_res$weights)
 )
 print(diag_df)
 
@@ -57,4 +68,4 @@ cat("------------------\n")
 print(results)
 sink()
 
-cat("\nValidation complete. Results saved to C:/Models/TGEP_Development/Validation_Results_Updated.txt\n")
+cat(sprintf("\nValidation complete. Results saved to %s\n", output_path))

@@ -1,5 +1,11 @@
 library(metafor)
-source("C:/Models/TGEP_Development/R/TGEP.R")
+
+# Use system.file() when installed as package, or source from project root
+if (requireNamespace("TGEP", quietly = TRUE)) {
+  library(TGEP)
+} else {
+  source(file.path(getwd(), "R", "TGEP.R"))
+}
 
 cat("=== TGEP STRESS TEST: EXTREME HETEROGENEITY ===\n")
 
@@ -16,16 +22,19 @@ yi <- rnorm(k, theta, sqrt(vi))
 res <- tgep_meta(yi, vi, n_boot = 0) # Fast run for diagnostic
 cat(sprintf("True Effect: %.2f | TGEP Est: %.4f | SE: %.4f\n", true_effect, res$estimate, res$se))
 
-# 3. Generate Diagnostic Plots (Save to file since no UI)
-png("C:/Models/TGEP_Development/Stress_Test_Diagnostics.png", width = 800, height = 400)
+# 3. Generate Diagnostic Plots (Save to output directory)
+output_dir <- file.path(getwd(), "output")
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+png(file.path(output_dir, "Stress_Test_Diagnostics.png"), width = 800, height = 400)
 plot.tgep(res)
 dev.off()
 
-png("C:/Models/TGEP_Development/Sparsity_Plot.png", width = 600, height = 400)
+png(file.path(output_dir, "Sparsity_Plot.png"), width = 600, height = 400)
 plot_sparsity(yi, vi)
 dev.off()
 
-cat("Stress test complete. Plots saved to C:/Models/TGEP_Development/\n")
+cat(sprintf("Stress test complete. Plots saved to %s\n", output_dir))
 
 # 4. Comparative Table
 reml <- rma(yi, vi, method="REML")

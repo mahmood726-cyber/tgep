@@ -2,8 +2,12 @@
 library(metafor)
 library(data.table)
 
-# Source core TGEP logic from local directory
-source("C:/Models/TGEP_Development/TGEP.R")
+# Use system.file() when installed as package, or source from project root
+if (requireNamespace("TGEP", quietly = TRUE)) {
+  library(TGEP)
+} else {
+  source(file.path(getwd(), "R", "TGEP.R"))
+}
 
 # Simulation Engine
 generate_data <- function(k = 10, true_effect = 0.3, tau2 = 0.05, bias = FALSE) {
@@ -26,9 +30,9 @@ run_sim_scenarios <- function(n_reps = 50) {
     list(name = "Med k, Pub Bias", k = 20, tau2 = 0.05, bias = TRUE)
   )
   methods <- list(
-    REML = function(y, v) { 
+    REML = function(y, v) {
       f <- rma(y, v, method="REML");
-      list(est = as.numeric(f$beta), ci_lb = f$ci.lb, ci_ub = f$ci.ub) 
+      list(est = as.numeric(f$beta), ci_lb = f$ci.lb, ci_ub = f$ci.ub)
     },
     TGEP = function(y, v) {
       # Use the main tgep_meta function from TGEP.R
@@ -46,8 +50,8 @@ run_sim_scenarios <- function(n_reps = 50) {
         res <- tryCatch(methods[[m]](dat$yi, dat$vi), error = function(e) NULL)
         if(!is.null(res)) {
           reps_data[[length(reps_data)+1]] <- data.table(
-            scenario = sc$name, method = m, 
-            estimate = res$est, 
+            scenario = sc$name, method = m,
+            estimate = res$est,
             covered = (0.3 >= res$ci_lb & 0.3 <= res$ci_ub)
           )
         }
@@ -58,7 +62,11 @@ run_sim_scenarios <- function(n_reps = 50) {
   rbindlist(all_results)
 }
 
-sink("C:/Models/TGEP_Development/Full_Methodology_Report_Updated.txt")
+output_dir <- file.path(getwd(), "output")
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+report_path <- file.path(output_dir, "Full_Methodology_Report_Updated.txt")
+
+sink(report_path)
 cat("TGEP COMPREHENSIVE EVALUATION REPORT (UPDATED)\n")
 cat("==============================================\n\n")
 
@@ -74,4 +82,4 @@ summary_stats <- sim_res[, .(
 print(summary_stats)
 sink()
 
-cat("Analysis complete. Report saved to C:/Models/TGEP_Development/Full_Methodology_Report_Updated.txt\n")
+cat(sprintf("Analysis complete. Report saved to %s\n", report_path))
