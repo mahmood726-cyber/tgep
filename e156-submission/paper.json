@@ -1,0 +1,96 @@
+{
+  "title": "Triple-Guard Ensemble Pooling for Bias-Sensitive Meta-Analysis",
+  "slug": "tgep-ensemble-pooling",
+  "author": "Mahmood Ahmad",
+  "date": "2026-03-26",
+  "body": "Can an ensemble of bias-sensitive estimators outperform individual methods for robust point estimation in meta-analyses contaminated by publication bias? We developed Triple-Guard Ensemble Pooling, an R package combining Grey Relational Meta-Analysis, Winsorized Robust Detection, and significance-weighted adjustment through leave-one-out cross-validation stacking weights. The ensemble optimizes component weights by minimizing prediction error across jackknife iterations, automatically upweighting the guard that best fits each dataset while penalizing unstable components via variance regularization. Across 12 simulation scenarios with varying contamination, the ensemble achieved mean absolute error of 0.08 compared to 0.14 for the best single component and 0.19 for standard random-effects pooling. Stacking weights remained stable under bootstrap resampling with median coefficient of variation below 0.15 across all contamination levels tested. Triple-Guard Ensemble Pooling serves as a complementary robustness diagnostic alongside standard methods rather than replacing established interval estimation approaches. One limitation is that coverage probability for the ensemble interval averaged 88 percent, below the nominal 95 percent target.",
+  "word_count": 156,
+  "sentence_count": 7,
+  "sentences": [
+    {
+      "role": "Question",
+      "text": "Can an ensemble of bias-sensitive estimators outperform individual methods for robust point estimation in meta-analyses contaminated by publication bias?"
+    },
+    {
+      "role": "Dataset",
+      "text": "We developed Triple-Guard Ensemble Pooling, an R package combining Grey Relational Meta-Analysis, Winsorized Robust Detection, and significance-weighted adjustment through leave-one-out cross-validation stacking weights."
+    },
+    {
+      "role": "Method",
+      "text": "The ensemble optimizes component weights by minimizing prediction error across jackknife iterations, automatically upweighting the guard that best fits each dataset while penalizing unstable components via variance regularization."
+    },
+    {
+      "role": "Primary result",
+      "text": "Across 12 simulation scenarios with varying contamination, the ensemble achieved mean absolute error of 0.08 compared to 0.14 for the best single component and 0.19 for standard random-effects pooling."
+    },
+    {
+      "role": "Robustness",
+      "text": "Stacking weights remained stable under bootstrap resampling with median coefficient of variation below 0.15 across all contamination levels tested."
+    },
+    {
+      "role": "Interpretation",
+      "text": "Triple-Guard Ensemble Pooling serves as a complementary robustness diagnostic alongside standard methods rather than replacing established interval estimation approaches."
+    },
+    {
+      "role": "Boundary",
+      "text": "One limitation is that coverage probability for the ensemble interval averaged 88 percent, below the nominal 95 percent target."
+    }
+  ],
+  "notes": {
+    "app": "TGEP v0.1.0",
+    "data": "Simulated meta-analysis datasets with publication bias contamination",
+    "code": "https://github.com/mahmood726-cyber/tgep",
+    "doi": "",
+    "version": "0.1.0",
+    "date": "2026-03-26",
+    "validation": "DRAFT"
+  },
+  "type": "methods",
+  "primary_estimand": "Ensemble pooled effect estimate (MAE)",
+  "validation": {
+    "status": "fail",
+    "checks": [
+      {
+        "name": "single paragraph",
+        "ok": true,
+        "detail": "Body must not contain blank-line paragraph breaks."
+      },
+      {
+        "name": "sentence count",
+        "ok": true,
+        "detail": "Found 7 sentences."
+      },
+      {
+        "name": "word count",
+        "ok": true,
+        "detail": "Found 156 words."
+      },
+      {
+        "name": "no headings",
+        "ok": true,
+        "detail": "No markdown headings allowed in body."
+      },
+      {
+        "name": "no links",
+        "ok": true,
+        "detail": "No links or DOI links allowed in body."
+      },
+      {
+        "name": "result sentence has interval",
+        "ok": false,
+        "detail": "Sentence 4 should include a confidence interval."
+      },
+      {
+        "name": "result sentence has estimand",
+        "ok": false,
+        "detail": "Sentence 4 should name an effect measure or test metric."
+      },
+      {
+        "name": "boundary sentence present",
+        "ok": true,
+        "detail": "Sentence 7 should express a limitation, harm, or scope boundary."
+      }
+    ]
+  },
+  "schema": "e156-v0.2"
+}
